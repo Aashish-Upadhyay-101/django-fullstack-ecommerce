@@ -19,7 +19,7 @@ Cart
                 <h5>Items: <strong>{{order.get_total_item}}</strong></h5>
             </th>
             <th>
-                <h5>Total:<strong> ${{order.get_grand_total}}</strong></h5>
+                <h5>Total:<strong> ${{order.get_grand_total|floatformat:2}}</strong></h5>
             </th>
             <th>
                 <a style="float:right; margin:5px;" class="btn btn-success"
@@ -50,12 +50,13 @@ Cart
         <div style="flex:1">
             <p class="quantity">{{item.quantity}}</p>
             <div class="quantity">
-                <span class="chg-quantity">&#8593;</span>
-                <span class="chg-quantity">&#8595;</span>
+                <span data-action="add" data-product={{item.product.id}} class="chg-quantity update-cart">&#8593;</span>
+                <span data-action="remove" data-product={{item.product.id}}
+                    class="chg-quantity update-cart">&#8595;</span>
             </div>
         </div>
         <div style="flex:1">
-            <p>${{item.get_item_total}}</p>
+            <p>${{item.get_item_total|floatformat:2}}</p>
             <!-- <p>${{item.quantity|item_total:item.product.price|floatformat:2 }}</p> -->
         </div>
     </div>

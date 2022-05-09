@@ -38,6 +38,18 @@ class Order(models.Model):
     isCompleted = models.BooleanField(default=False, blank=True, null=True)
     transaction_id = models.CharField(max_length=10, null=True);
 
+    '''
+    digital product no need to be shipped, so if there is only digital product then no shipping needed
+    '''
+    @property
+    def shipping(self):
+        shipping = False 
+        orderItem = self.orderitem_set.all()
+        for item in orderItem:
+            if item.product.isDigital == False:
+                shipping = True 
+                break
+        return shipping
 
     @property
     def get_grand_total(self):
@@ -55,8 +67,8 @@ class Order(models.Model):
 class OrderItem(models.Model):
     product = models.ForeignKey(Product, on_delete=models.SET_NULL, null=True)
     order = models.ForeignKey(Order, on_delete=models.SET_NULL, null=True)
-    quantity = models.PositiveIntegerField()
-    date_added = models.DateTimeField(auto_now_add=True)
+    quantity = models.IntegerField(default=0)
+    date_added = models.DateTimeField(auto_now_add=True, blank=True, null=True)
 
     @property
     def get_item_total(self):
