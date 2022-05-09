@@ -1,76 +1,39 @@
 from ctypes import addressof
 import json
+from math import prod
 from django.shortcuts import render
 from django.http import HttpResponse, JsonResponse
 import datetime
 from .models import *
-
+from .utils import cartData, cookieCart
 
 
 # Create your views here.
 def store(request):
-    if request.user.is_authenticated:
-        customer = request.user.customer
-        order, created = Order.objects.get_or_create(customer=customer, isCompleted=False)
-        items = order.orderitem_set.all() # parent_model.lowercaseed_child_set.querySet()
-        total_item = order.get_total_item;
-    else:
-        items = []
-        order = {'get_grand_total':0, 'get_total_item': 0, 'shipping':False}
-        total_item = order['get_total_item']
+    data = cartData(request)
+    total_item = data['total_item']
+    order = data['order']
+    items = data['items']
         
     products = Product.objects.all()
     context = {'products': products, 'total_item': total_item}
     return render(request,'store/store.html', context=context)
 
 def cart(request):
-    '''
-    if the user is authenticated
-    set customer to req.user.customer (the current logged in user)
-    get_or_create() return a tuple i.e (object, created) 
-    items: grabbing all the orderItem (backward relationship more on this : https://docs.djangoproject.com/en/4.0/topics/db/queries/#following-relationships-backward)
-    '''
-    if request.user.is_authenticated:
-        customer = request.user.customer
-        order, created = Order.objects.get_or_create(customer=customer, isCompleted=False)
-        items = order.orderitem_set.all() # parent_model.lowercaseed_child_set.querySet()
-        total_item = order.get_total_item;
+    data = cartData(request)
+    total_item = data['total_item']
+    order = data['order']
+    items = data['items']
 
-    else:
-        try:
-            cart = json.loads(request.COOKIES['cart'])
-        except:
-            cart = {}
-        print(cart)
-        items = []
-        order = {'get_grand_total':0, 'get_total_item': 0, 'shipping':False}
-        total_item = order['get_total_item']
-
-        for i in cart:
-            total_item += cart[i]['quantity']
-
-            product = Product.objects.get(id=i)
-            total = (product.price * cart[i]['quantity'])
-
-            order['get_grand_total'] += total
-            order['get_total_item'] += cart[i]['quantity']
-
-    
     context = {'items': items, 'order': order, 'total_item': total_item}
     return render(request,'store/cart.html', context=context)
 
 def checkout(request):
-    if request.user.is_authenticated:
-        customer = request.user.customer
-        order, created = Order.objects.get_or_create(customer=customer, isCompleted=False)
-        items = order.orderitem_set.all() # parent_model.lowercaseed_child_set.querySet()
-        total_item = order.get_total_item;
-    else:
-        items = []
-        order = {'get_grand_total':0, 'get_total_item': 0, 'shipping':False}
-        total_item = len(items)
+    data = cartData(request)
+    total_item = data['total_item']
+    order = data['order']
+    items = data['items']
 
-    
     context = {'items': items, 'order': order, 'total_item': total_item}
 
     return render(request,'store/checkout.html', context=context)
@@ -92,10 +55,8 @@ def updateItem(request):
     print(orderItem.quantity)
 
     if action == 'add':
-        # orderItem.quantity = (orderItem.quantity + 1)
         orderItem.quantity += 1
     elif action == 'remove':
-        # orderItem.quantity = (orderItem.quantity - 1)
         orderItem.quantity -= 1
 
     orderItem.save()
@@ -117,20 +78,36 @@ def process_order(request):
         total = float(data['form']['total'])
         order.transaction_id = transaction_id
 
-        if total == order.get_grand_total:
-            order.isCompleted = True 
-        
-        order.save() 
+    else:
+        print("COOKIES", request.COOKIES)
+        name = data['form']['name']
+        email = data['form']['email']
+
+        cookieData = cookieCart(request)
+        items = cookieData['items']
+
+        customer, created = Customer.objects.get_or_create(email=email)
+        customer.name = name
+        customer.save()
+
+        order = Order.objects.create(customer=customer, isCompleted=False)
+
+        for item in items:
+            product = Product.objects.get(id=item['product']['id'])
+            orderItem = OrderItem.objects.create(product=product, order=order, quantity=item['quantity'])
+
+    if total == order.get_grand_total:
+        order.isCompleted = True 
     
-        if order.shipping == True:
-            ShippingAddress.objects.create(
-                customer = customer,
-                order = order, 
-                address = data['shipping']['address'],
-                city = data['shipping']['city'],
-                state = data['shipping']['state'],
-                zipcode = data['shipping']['zipcode'],
-            )
+    order.save() 
 
-
+    if order.shipping == True:
+        ShippingAddress.objects.create(
+            customer = customer,
+            order = order, 
+            address = data['shipping']['address'],
+            city = data['shipping']['city'],
+            state = data['shipping']['state'],
+            zipcode = data['shipping']['zipcode'],
+        )
     return JsonResponse("Payment success...", safe=False)  
